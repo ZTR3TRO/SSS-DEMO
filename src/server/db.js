@@ -11,6 +11,15 @@ export const db = new Database(path.join(dataDir, 'salon.db'))
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
+/** Agrega una columna si no existe todavía (SQLite no soporta ADD COLUMN IF NOT EXISTS). */
+function agregarColumnaSiFalta(tabla, columna, definicion) {
+  const columnas = db.prepare(`PRAGMA table_info(${tabla})`).all()
+  const existe = columnas.some((c) => c.name === columna)
+  if (!existe) {
+    db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${definicion}`)
+  }
+}
+
 export function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS servicios (
@@ -51,4 +60,8 @@ export function initDb() {
       precio REAL NOT NULL
     );
   `)
+
+  // Migraciones incrementales: columnas agregadas después de la v1 del esquema.
+  agregarColumnaSiFalta('productos', 'categoria', "TEXT NOT NULL DEFAULT 'General'")
+  agregarColumnaSiFalta('servicios', 'categoria', "TEXT NOT NULL DEFAULT 'General'")
 }
