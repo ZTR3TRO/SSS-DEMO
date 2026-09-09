@@ -33,4 +33,21 @@ export function seed() {
     ]
     db.transaction(() => datos.forEach((p) => insert.run(...p)))()
   }
+
+  const citas = db.prepare('SELECT COUNT(*) AS n FROM citas').get().n
+  if (citas === 0) {
+    const servicios = db.prepare('SELECT id, nombre FROM servicios').all()
+    const porNombre = (nombre) => servicios.find((s) => s.nombre === nombre)?.id ?? null
+    const hoy = new Date().toISOString().slice(0, 10)
+
+    const insert = db.prepare(
+      'INSERT INTO citas (cliente, servicio, servicio_id, fecha, hora, estado) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    const datos = [
+      ['Renata Cabrera', 'Corte de cabello', porNombre('Corte de cabello'), hoy, '10:00', 'confirmada'],
+      ['Mariana Ibarra', 'Manicure', porNombre('Manicure'), hoy, '11:30', 'pendiente'],
+      ['Diego Salcido', 'Tinte de raíz', porNombre('Tinte de raíz'), hoy, '13:00', 'pendiente'],
+    ]
+    db.transaction(() => datos.forEach((c) => insert.run(...c)))()
+  }
 }

@@ -64,4 +64,6 @@ export function initDb() {
   // Migraciones incrementales: columnas agregadas después de la v1 del esquema.
   agregarColumnaSiFalta('productos', 'categoria', "TEXT NOT NULL DEFAULT 'General'")
   agregarColumnaSiFalta('servicios', 'categoria', "TEXT NOT NULL DEFAULT 'General'")
+  agregarColumnaSiFalta('citas', 'servicio_id', 'INTEGER REFERENCES servicios(id)')
+  agregarColumnaSiFalta('citas', 'notas', 'TEXT')
 }
