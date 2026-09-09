@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { db, initDb } from './db.js'
 import { seed } from './seed.js'
 import inventarioRoutes from './routes/inventario.js'
+import posRoutes from './routes/pos.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -29,7 +30,7 @@ app.get('/api/health', (_req, res) => {
 })
 
 // Rutas por módulo (se pueblan aqui según el paso que corresponda)
-// app.use('/api/pos', posRoutes)
+app.use('/api/pos', posRoutes)
 app.use('/api/inventario', inventarioRoutes)
 // app.use('/api/citas', citasRoutes)
 

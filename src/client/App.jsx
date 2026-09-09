@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import PaginaInicio from './pages/PaginaInicio'
 import PaginaInventario from './pages/PaginaInventario'
+import PaginaPOS from './pages/PaginaPOS'
 import PaginaProximamente from './pages/PaginaProximamente'
 import PortalInicio from './pages/PortalInicio'
 
@@ -17,7 +18,7 @@ const TITULOS_ADMIN = {
   usuarios: { titulo: 'Usuarios', descripcion: 'Empleados y clientes frecuentes' },
 }
 
-const PASOS_ADMIN = { pos: 3, citas: 4, usuarios: 5 }
+const PASOS_ADMIN = { citas: 4, usuarios: 5 }
 
 function PanelAdmin({ sub, api, navegar }) {
   const info = TITULOS_ADMIN[sub] ?? TITULOS_ADMIN.inicio
@@ -30,7 +31,8 @@ function PanelAdmin({ sub, api, navegar }) {
         <main className="scrollbar-fina flex-1 overflow-y-auto px-8 py-8">
           {sub === 'inicio' && <PaginaInicio api={api} onNavegar={navegar} />}
           {sub === 'inventario' && <PaginaInventario />}
-          {sub !== 'inicio' && sub !== 'inventario' && (
+          {sub === 'pos' && <PaginaPOS />}
+          {sub !== 'inicio' && sub !== 'inventario' && sub !== 'pos' && (
             <PaginaProximamente modulo={info.titulo} paso={PASOS_ADMIN[sub] ?? '—'} />
           )}
         </main>
