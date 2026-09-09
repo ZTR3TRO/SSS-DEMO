@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #d4af37;
+  --color-accent-dark: #18181b;
+  --color-ink: #0d0d10;
+  --color-paper: #ffffff;
+  --color-noche: #111113;
+  --color-bone: #f4f1ec;
+  --font-display: "Archivo Expanded", "Inter", sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+}

@@ -1,0 +1,54 @@
+import Database from 'better-sqlite3'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const dataDir = path.resolve(__dirname, '../../data')
+fs.mkdirSync(dataDir, { recursive: true })
+
+export const db = new Database(path.join(dataDir, 'salon.db'))
+db.pragma('journal_mode = WAL')
+db.pragma('foreign_keys = ON')
+
+export function initDb() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS servicios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      precio REAL NOT NULL,
+      duracion_min INTEGER NOT NULL DEFAULT 30
+    );
+
+    CREATE TABLE IF NOT EXISTS productos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      precio REAL NOT NULL,
+      stock INTEGER NOT NULL DEFAULT 0,
+      stock_min INTEGER NOT NULL DEFAULT 5
+    );
+
+    CREATE TABLE IF NOT EXISTS citas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cliente TEXT NOT NULL,
+      servicio TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      hora TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente'
+    );
+
+    CREATE TABLE IF NOT EXISTS ventas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total REAL NOT NULL,
+      creada_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ventas_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      venta_id INTEGER NOT NULL REFERENCES ventas(id),
+      nombre TEXT NOT NULL,
+      cantidad INTEGER NOT NULL,
+      precio REAL NOT NULL
+    );
+  `)
+}
