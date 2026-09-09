@@ -33,7 +33,8 @@ SSS-DEMO/
 ├── vite.config.js          proxy /api → http://localhost:3001
 ├── index.html
 ├── public/
-│   └── favicon.svg         monograma SSS (oro #a97e46 sobre #111011)
+│   ├── logo.png            logo de la marca
+│   └── icono.png           favicon / isotipo
 └── src/
     ├── index.css           Tailwind v4 + paleta de marca
     ├── server/
@@ -79,13 +80,4 @@ Tablas creadas por `initDb()` en `src/server/db.js`:
 - `data/` (SQLite), `dist/` y `node_modules/` están en `.gitignore`.
 - La base se regenera con `seed()` al arrancar si está vacía; para reiniciarla: borrar `data/salon.db`.
 - CSS-first de Tailwind 4: todos los tokens de marca viven en `@theme` dentro de `src/index.css`.
-
-## Paleta
-
-```css
---color-accent: #d4af37;   /* dorado champagne */
---color-ink:   #0d0d10;    /* texto */
---color-paper: #ffffff;    /* superficies */
---color-noche: #111113;    /* oscuro / contraste */
---color-bone:  #f4f1ec;    /* neutro claro */
-```
+- Los assets estáticos (logo, icono) viven en `public/`.
