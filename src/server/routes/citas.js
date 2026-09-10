@@ -63,6 +63,22 @@ router.get('/disponibilidad', (req, res) => {
   res.json({ slots, duracion })
 })
 
+// GET /api/citas/mis-citas?cliente_id=1 — Fase 6: citas de un cliente (Portal).
+router.get('/mis-citas', (req, res) => {
+  const { cliente_id } = req.query
+  if (!cliente_id) return res.status(400).json({ ok: false, errores: ['Falta cliente_id.'] })
+
+  const citas = db
+    .prepare(
+      `SELECT c.*, s.duracion_min AS servicio_duracion, s.precio AS servicio_precio
+       FROM citas c LEFT JOIN servicios s ON s.id = c.servicio_id
+       WHERE c.cliente_id = ? AND c.fecha >= date('now')
+       ORDER BY c.fecha, c.hora LIMIT 50`,
+    )
+    .all(cliente_id)
+  res.json({ citas })
+})
+
 // GET /api/citas?fecha=YYYY-MM-DD
 router.get('/', (req, res) => {
   const { fecha } = req.query
