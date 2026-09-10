@@ -176,16 +176,51 @@ const citasPendientes = db.prepare(`
   ORDER BY wm.id DESC
 `)
 
+function esJidPn(jid) {
+  return !!jid && (jid.endsWith('@s.whatsapp.net') || jid.endsWith('.whatsapp.net'))
+}
+
+function esJidLid(jid) {
+  return !!jid && jid.endsWith('@lid')
+}
+
+/** Traduce un LID (…@lid) al JID de teléfono real usando el mapping que Baileys mantiene. */
+async function resolverLidANumero(lidJid) {
+  try {
+    const pn = await socket?.signalRepository?.lidMapping?.getPNForLID?.(lidJid)
+    if (pn && esJidPn(pn)) return pn
+  } catch (e) {
+    console.warn('[whatsapp] Fallo al resolver LID→número:', e.message)
+  }
+  return null
+}
+
 async function manejarMensajeEntrante(mensaje) {
   const key = mensaje.key
   if (!key || key.fromMe) return
 
-  // WhatsApp a veces entrega el remitente como un LID (identificador opaco, ej. "123...@lid")
-  // en vez del número de teléfono real. Cuando pasa eso, Baileys expone el número real en
-  // `key.senderPn` — lo usamos primero, y el remoteJid solo como respaldo.
-  const jidParaNumero = key.senderPn || key.remoteJid
+  // WhatsApp migró los chats 1:1 a direccionamiento por LID: el remitente puede llegar
+  // como "…@lid" en vez del número real. Baileys expone el JID "alterno" (el opuesto)
+  // en `key.remoteJidAlt`/`key.participantAlt` — preferimos el que sea el número real.
+  const remitenteJid = key.participant || key.remoteJid
+  const altJid = key.participantAlt || key.remoteJidAlt
+  if (remitenteJid?.endsWith('@g.us')) return // chat grupal, no aplica a confirmaciones
+
+  let jidParaNumero = null
+  if (esJidPn(altJid)) jidParaNumero = altJid
+  else if (esJidPn(remitenteJid)) jidParaNumero = remitenteJid
+  else if (esJidLid(remitenteJid)) jidParaNumero = await resolverLidANumero(remitenteJid)
+
   const jidNumeros = normalizarJid(jidParaNumero)
-  if (!jidNumeros) return
+  if (!jidNumeros) {
+    console.warn('[whatsapp] No se pudo identificar el número del remitente:', {
+      remoteJid: key.remoteJid,
+      remoteJidAlt: key.remoteJidAlt,
+      participant: key.participant,
+      participantAlt: key.participantAlt,
+    })
+    return
+  }
 
   const texto =
     mensaje.message?.conversation ??
