@@ -85,10 +85,18 @@ router.get('/', (req, res) => {
 })
 
 // POST /api/citas
+// Fase 5 (Opción A): admite cliente_id de una ficha ya registrada; si no se manda,
+// la cita se sigue creando "rápida" solo con el texto libre en `cliente`, como hasta ahora.
 router.post('/', (req, res) => {
-  const { cliente, servicio_id, fecha, hora, notas } = req.body
+  const { cliente, cliente_id, servicio_id, fecha, hora, notas } = req.body
   const errores = []
-  if (!cliente?.trim()) errores.push('El nombre del cliente es obligatorio.')
+
+  const clienteFicha = cliente_id ? db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id) : null
+  if (cliente_id && !clienteFicha) errores.push('El cliente seleccionado no existe.')
+
+  // El texto libre es obligatorio salvo que venga de una ficha de cliente (se usa su nombre como snapshot).
+  const nombreCliente = cliente?.trim() || clienteFicha?.nombre
+  if (!nombreCliente) errores.push('El nombre del cliente es obligatorio.')
   if (!fecha) errores.push('La fecha es obligatoria.')
   if (!hora) errores.push('La hora es obligatoria.')
 
@@ -110,9 +118,18 @@ router.post('/', (req, res) => {
 
   const info = db
     .prepare(
-      'INSERT INTO citas (cliente, servicio, servicio_id, fecha, hora, estado, notas) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO citas (cliente, cliente_id, servicio, servicio_id, fecha, hora, estado, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     )
-    .run(cliente.trim(), servicio?.nombre ?? 'Servicio general', servicio?.id ?? null, fecha, hora, 'pendiente', notas ?? null)
+    .run(
+      nombreCliente,
+      clienteFicha?.id ?? null,
+      servicio?.nombre ?? 'Servicio general',
+      servicio?.id ?? null,
+      fecha,
+      hora,
+      'pendiente',
+      notas ?? null,
+    )
 
   const cita = db.prepare('SELECT * FROM citas WHERE id = ?').get(info.lastInsertRowid)
   res.status(201).json({ ok: true, cita })

@@ -8,6 +8,7 @@ import { seed } from './seed.js'
 import inventarioRoutes from './routes/inventario.js'
 import posRoutes from './routes/pos.js'
 import citasRoutes from './routes/citas.js'
+import usuariosRoutes from './routes/usuarios.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -26,6 +27,8 @@ app.get('/api/health', (_req, res) => {
     productos: db.prepare('SELECT COUNT(*) AS n FROM productos').get().n,
     citas: db.prepare('SELECT COUNT(*) AS n FROM citas').get().n,
     ventas: db.prepare('SELECT COUNT(*) AS n FROM ventas').get().n,
+    empleados: db.prepare('SELECT COUNT(*) AS n FROM empleados WHERE activo = 1').get().n,
+    clientes: db.prepare('SELECT COUNT(*) AS n FROM clientes').get().n,
   }
   res.json({ ok: true, servicio: 'SSSALÓN API', modulo: 'monolito', conteo })
 })
@@ -34,6 +37,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/pos', posRoutes)
 app.use('/api/inventario', inventarioRoutes)
 app.use('/api/citas', citasRoutes)
+app.use('/api/usuarios', usuariosRoutes)
 
 if (fs.existsSync(dist)) {
   app.use(express.static(dist))

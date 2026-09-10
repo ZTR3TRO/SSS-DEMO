@@ -59,6 +59,23 @@ export function initDb() {
       cantidad INTEGER NOT NULL,
       precio REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS empleados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      puesto TEXT NOT NULL,
+      telefono TEXT,
+      activo INTEGER NOT NULL DEFAULT 1,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS clientes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      telefono TEXT,
+      notas TEXT,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
 
   // Migraciones incrementales: columnas agregadas después de la v1 del esquema.
@@ -66,4 +83,6 @@ export function initDb() {
   agregarColumnaSiFalta('servicios', 'categoria', "TEXT NOT NULL DEFAULT 'General'")
   agregarColumnaSiFalta('citas', 'servicio_id', 'INTEGER REFERENCES servicios(id)')
   agregarColumnaSiFalta('citas', 'notas', 'TEXT')
+  // Fase 5 — vínculo opcional cita → ficha de cliente (Opción A: nullable, conserva el texto libre como respaldo).
+  agregarColumnaSiFalta('citas', 'cliente_id', 'INTEGER REFERENCES clientes(id)')
 }

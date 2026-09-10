@@ -8,6 +8,7 @@ import PaginaInicio from './pages/PaginaInicio'
 import PaginaInventario from './pages/PaginaInventario'
 import PaginaPOS from './pages/PaginaPOS'
 import PaginaCitas from './pages/PaginaCitas'
+import PaginaUsuarios from './pages/PaginaUsuarios'
 import PaginaProximamente from './pages/PaginaProximamente'
 import PortalInicio from './pages/PortalInicio'
 
@@ -19,7 +20,7 @@ const TITULOS_ADMIN = {
   usuarios: { titulo: 'Usuarios', descripcion: 'Empleados y clientes frecuentes' },
 }
 
-const PASOS_ADMIN = { usuarios: 5 }
+const SECCIONES_LISTAS = ['inicio', 'inventario', 'pos', 'citas', 'usuarios']
 
 function PanelAdmin({ sub, api, navegar }) {
   const info = TITULOS_ADMIN[sub] ?? TITULOS_ADMIN.inicio
@@ -34,9 +35,8 @@ function PanelAdmin({ sub, api, navegar }) {
           {sub === 'inventario' && <PaginaInventario />}
           {sub === 'pos' && <PaginaPOS />}
           {sub === 'citas' && <PaginaCitas />}
-          {sub !== 'inicio' && sub !== 'inventario' && sub !== 'pos' && sub !== 'citas' && (
-            <PaginaProximamente modulo={info.titulo} paso={PASOS_ADMIN[sub] ?? '—'} />
-          )}
+          {sub === 'usuarios' && <PaginaUsuarios />}
+          {!SECCIONES_LISTAS.includes(sub) && <PaginaProximamente modulo={info.titulo} paso="6" />}
         </main>
       </div>
     </div>
