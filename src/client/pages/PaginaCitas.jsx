@@ -1,25 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button'
 import { Modal, useModal } from '../lib/modal'
 import { useToast } from '../lib/toast'
-
-async function pedir(url, opciones) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opciones,
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.errores?.[0] ?? 'Ocurrió un error inesperado.')
-  return data
-}
+import { pedir } from '../lib/api'
 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
 
 const ESTILOS_ESTADO = {
-  pendiente: 'bg-warning-soft text-warning',
-  confirmada: 'bg-success-soft text-success',
-  completada: 'bg-zinc-100 text-zinc-500',
-  cancelada: 'bg-danger-soft text-danger',
+  pendiente: 'bg-warning-soft text-warning border-warning/25',
+  confirmada: 'bg-success-soft text-success border-success/25',
+  completada: 'bg-canvas text-ink-muted border-border',
+  cancelada: 'bg-danger-soft text-danger border-danger/25',
 }
 
 function ModalNuevaCita({ abierto, onCerrar, fechaInicial, servicios, onCreada }) {
@@ -46,11 +37,22 @@ function ModalNuevaCita({ abierto, onCerrar, fechaInicial, servicios, onCreada }
     setCargandoSlots(true)
     setHoraElegida('')
     pedir(`/api/citas/disponibilidad?fecha=${fecha}&servicio_id=${servicioId}`)
-      .then((data) => setSlots(data.slots))
+      .then((data) => setSlots(data.slots || []))
       .catch((e) => toast.error(e.message))
       .finally(() => setCargandoSlots(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto, fecha, servicioId])
+
+  const { slotsManana, slotsTarde } = useMemo(() => {
+    const manana = []
+    const tarde = []
+    slots.forEach((s) => {
+      const horaNum = parseInt(s.hora.split(':')[0], 10)
+      if (horaNum < 13) manana.push(s)
+      else tarde.push(s)
+    })
+    return { slotsManana: manana, slotsTarde: tarde }
+  }, [slots])
 
   const guardar = async (e) => {
     e.preventDefault()
@@ -75,40 +77,40 @@ function ModalNuevaCita({ abierto, onCerrar, fechaInicial, servicios, onCreada }
   }
 
   return (
-    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Nueva cita" ancho="max-w-lg">
+    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Agendar nueva cita" ancho="max-w-lg">
       <form onSubmit={guardar} className="space-y-4">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Cliente</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Nombre del cliente</label>
           <input
             value={cliente}
             onChange={(e) => setCliente(e.target.value)}
             required
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-ink focus:outline-none"
-            placeholder="Nombre del cliente"
+            className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:outline-none"
+            placeholder="Ej. Renata Cabrera"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fecha</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Fecha</label>
             <input
               type="date"
               value={fecha}
               min={hoyISO()}
               onChange={(e) => setFecha(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-ink focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Servicio</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Servicio</label>
             <select
               value={servicioId}
               onChange={(e) => setServicioId(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-ink focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
             >
               {servicios.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.nombre} · {s.duracion_min} min
+                  {s.nombre} ({s.duracion_min} min)
                 </option>
               ))}
             </select>
@@ -116,38 +118,70 @@ function ModalNuevaCita({ abierto, onCerrar, fechaInicial, servicios, onCreada }
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Horario disponible</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Horarios del día</label>
           {cargandoSlots ? (
-            <p className="mt-2 text-sm text-zinc-400">Calculando disponibilidad…</p>
+            <p className="py-6 text-center text-xs text-ink-faint">Consultando agenda disponible…</p>
           ) : (
-            <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5">
-              {slots.map((s) => (
-                <button
-                  type="button"
-                  key={s.hora}
-                  disabled={!s.disponible}
-                  onClick={() => setHoraElegida(s.hora)}
-                  className={`rounded-lg py-2 text-xs font-semibold transition-colors ${
-                    !s.disponible
-                      ? 'cursor-not-allowed bg-zinc-100 text-zinc-300 line-through'
-                      : horaElegida === s.hora
-                        ? 'bg-ink text-white'
-                        : 'border border-zinc-300 text-zinc-600 hover:border-ink hover:text-ink'
-                  }`}
-                >
-                  {s.hora}
-                </button>
-              ))}
+            <div className="mt-2 space-y-3">
+              {slotsManana.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Mañana</span>
+                  <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                    {slotsManana.map((s) => (
+                      <button
+                        type="button"
+                        key={s.hora}
+                        disabled={!s.disponible}
+                        onClick={() => setHoraElegida(s.hora)}
+                        className={`rounded-md py-1.5 text-xs font-medium transition-colors ${
+                          !s.disponible
+                            ? 'cursor-not-allowed bg-canvas text-ink-faint/40'
+                            : horaElegida === s.hora
+                              ? 'bg-ink text-white shadow-2xs font-semibold'
+                              : 'border border-border bg-surface text-ink hover:border-ink-faint'
+                        }`}
+                      >
+                        {s.hora}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {slotsTarde.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Tarde</span>
+                  <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                    {slotsTarde.map((s) => (
+                      <button
+                        type="button"
+                        key={s.hora}
+                        disabled={!s.disponible}
+                        onClick={() => setHoraElegida(s.hora)}
+                        className={`rounded-md py-1.5 text-xs font-medium transition-colors ${
+                          !s.disponible
+                            ? 'cursor-not-allowed bg-canvas text-ink-faint/40'
+                            : horaElegida === s.hora
+                              ? 'bg-ink text-white shadow-2xs font-semibold'
+                              : 'border border-border bg-surface text-ink hover:border-ink-faint'
+                        }`}
+                      >
+                        {s.hora}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variante="fantasma" onClick={onCerrar}>
+        <div className="flex justify-end gap-2.5 border-t border-border pt-4">
+          <Button type="button" variante="fantasma" tamano="sm" onClick={onCerrar}>
             Cancelar
           </Button>
-          <Button type="submit" variante="dorada" disabled={guardando || !horaElegida}>
-            {guardando ? 'Agendando…' : 'Agendar cita'}
+          <Button type="submit" variante="primaria" tamano="sm" disabled={guardando || !horaElegida}>
+            {guardando ? 'Agendando…' : 'Confirmar reserva'}
           </Button>
         </div>
       </form>
@@ -169,7 +203,7 @@ export default function PaginaCitas() {
     setCargando(true)
     try {
       const data = await pedir(`/api/citas?fecha=${f}`)
-      setCitas(data.citas)
+      setCitas(data.citas || [])
     } catch (e) {
       toast.error(e.message)
     } finally {
@@ -178,8 +212,9 @@ export default function PaginaCitas() {
   }
 
   useEffect(() => {
-    pedir('/api/citas/servicios').then((d) => setServicios(d.servicios)).catch((e) => toast.error(e.message))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    pedir('/api/citas/servicios')
+      .then((d) => setServicios(d.servicios || []))
+      .catch((e) => toast.error(e.message))
   }, [])
 
   useEffect(() => {
@@ -187,88 +222,179 @@ export default function PaginaCitas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha])
 
+  const cambiarDia = (offset) => {
+    const d = new Date(`${fecha}T12:00:00`)
+    d.setDate(d.getDate() + offset)
+    setFecha(d.toISOString().slice(0, 10))
+  }
+
   const cambiarEstado = async (cita, estado) => {
     if (estado === 'cancelada') {
       const ok = await confirmar({
-        titulo: 'Cancelar cita',
-        mensaje: `¿Cancelar la cita de "${cita.cliente}" a las ${cita.hora}?`,
-        textoConfirmar: 'Cancelar cita',
+        titulo: 'Cancelar cita programada',
+        mensaje: `¿Deseas cancelar la cita de ${cita.cliente} fijada a las ${cita.hora}?`,
+        textoConfirmar: 'Sí, cancelar cita',
         peligro: true,
       })
       if (!ok) return
     }
     try {
       await pedir(`/api/citas/${cita.id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) })
-      toast.exito(`Cita de "${cita.cliente}" actualizada a "${estado}".`)
+      toast.exito(`Cita de "${cita.cliente}" actualizada a ${estado}.`)
       cargarCitas()
     } catch (e) {
       toast.error(e.message)
     }
   }
 
+  const fechaFormateada = useMemo(() => {
+    if (!fecha) return ''
+    const [y, m, d] = fecha.split('-')
+    const dateObj = new Date(Number(y), Number(m) - 1, Number(d))
+    return dateObj.toLocaleDateString('es-MX', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  }, [fecha])
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-        />
-        <Button variante="dorada" onClick={() => setModalAbierto(true)} disabled={servicios.length === 0}>
-          + Nueva cita
+      {/* Barra de navegación de agenda */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-lg border border-border bg-surface p-1 shadow-2xs">
+            <button
+              onClick={() => cambiarDia(-1)}
+              className="rounded p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink"
+              title="Día anterior"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setFecha(hoyISO())}
+              className="px-2.5 py-1 text-xs font-semibold text-ink hover:text-accent transition-colors"
+            >
+              Hoy
+            </button>
+            <button
+              onClick={() => cambiarDia(1)}
+              className="rounded p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink"
+              title="Día siguiente"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <input
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink focus:border-ink focus:outline-none"
+          />
+
+          <span className="hidden text-xs capitalize text-ink-muted md:inline-block">
+            {fechaFormateada}
+          </span>
+        </div>
+
+        <Button variante="primaria" tamano="sm" onClick={() => setModalAbierto(true)}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Nueva cita
         </Button>
       </div>
 
+      {/* Lista de citas en formato cronológico continuo */}
       {cargando ? (
-        <p className="py-12 text-center text-sm text-zinc-400">Cargando agenda…</p>
+        <div className="rounded-xl border border-border bg-surface py-20 text-center">
+          <p className="text-xs text-ink-faint">Consultando citas…</p>
+        </div>
       ) : citas.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-paper py-16 text-center">
-          <p className="text-sm text-zinc-500">No hay citas agendadas para este día.</p>
+        <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
+          <svg className="mx-auto h-8 w-8 text-ink-faint/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p className="mt-2 text-xs text-ink-muted">Sin citas programadas para esta fecha.</p>
+          <Button
+            variante="secundaria"
+            tamano="sm"
+            className="mt-3"
+            onClick={() => setModalAbierto(true)}
+          >
+            Agendar primer turno
+          </Button>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {citas.map((c) => (
-            <li
-              key={c.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-paper p-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-16 text-center">
-                  <p className="font-display text-lg font-bold text-ink">{c.hora}</p>
-                  <p className="text-[11px] text-zinc-400">{c.servicio_duracion ?? 30} min</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-ink">{c.cliente}</p>
-                  <p className="text-sm text-zinc-500">{c.servicio}</p>
-                </div>
-              </div>
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-2xs">
+          <div className="divide-y divide-border-subtle">
+            {citas.map((c) => (
+              <div
+                key={c.id}
+                className="group flex flex-col gap-4 p-4.5 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-surface-hover/50"
+              >
+                {/* Bloque Hora y Cliente */}
+                <div className="flex items-center gap-5">
+                  <div className="w-16 shrink-0 border-r border-border pr-3">
+                    <p className="font-display text-base font-bold text-ink leading-none">{c.hora}</p>
+                    <p className="text-[11px] text-ink-faint mt-1">{c.servicio_duracion ?? 30} min</p>
+                  </div>
 
-              <div className="flex items-center gap-3">
-                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${ESTILOS_ESTADO[c.estado]}`}>
-                  {c.estado}
-                </span>
-                {c.estado === 'pendiente' && (
-                  <button onClick={() => cambiarEstado(c, 'confirmada')} className="text-xs font-semibold text-success hover:text-success/70">
-                    Confirmar
-                  </button>
-                )}
-                {c.estado === 'confirmada' && (
-                  <button onClick={() => cambiarEstado(c, 'completada')} className="text-xs font-semibold text-zinc-500 hover:text-ink">
-                    Completar
-                  </button>
-                )}
-                {c.estado !== 'cancelada' && c.estado !== 'completada' && (
-                  <button onClick={() => cambiarEstado(c, 'cancelada')} className="text-xs font-semibold text-danger hover:text-danger/70">
-                    Cancelar
-                  </button>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h4 className="font-semibold text-sm text-ink leading-tight">{c.cliente}</h4>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                          ESTILOS_ESTADO[c.estado] ?? ESTILOS_ESTADO.pendiente
+                        }`}
+                      >
+                        {c.estado}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-muted mt-0.5">{c.servicio}</p>
+                  </div>
+                </div>
+
+                {/* Acciones estructuradas con microbotones */}
+                <div className="flex items-center justify-end gap-1.5 self-end sm:self-center">
+                  {c.estado === 'pendiente' && (
+                    <button
+                      onClick={() => cambiarEstado(c, 'confirmada')}
+                      className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-success hover:border-success/30 hover:bg-success-soft transition-colors"
+                    >
+                      Confirmar
+                    </button>
+                  )}
+                  {c.estado === 'confirmada' && (
+                    <button
+                      onClick={() => cambiarEstado(c, 'completada')}
+                      className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-muted hover:border-ink hover:text-ink transition-colors"
+                    >
+                      Completar
+                    </button>
+                  )}
+                  {c.estado !== 'cancelada' && c.estado !== 'completada' && (
+                    <button
+                      onClick={() => cambiarEstado(c, 'cancelada')}
+                      className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-danger hover:border-danger/30 hover:bg-danger-soft transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </div>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+        </div>
       )}
 
+      {/* Modal Nueva Cita */}
       <ModalNuevaCita
         abierto={modalAbierto}
         onCerrar={() => setModalAbierto(false)}

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import Button from '../components/Button'
 
 const ModalContext = createContext(null)
 
@@ -18,21 +19,23 @@ export function Modal({ abierto, onCerrar, titulo, children, ancho = 'max-w-md' 
 
   return (
     <div className="animate-fade-in fixed inset-0 z-[90] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-ink/50" onClick={onCerrar} />
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" onClick={onCerrar} />
       <div
         role="dialog"
         aria-modal="true"
-        className={`animate-modal-in relative w-full ${ancho} rounded-2xl bg-white p-6 shadow-2xl shadow-black/20`}
+        className={`animate-modal-in relative w-full ${ancho} rounded-xl border border-border bg-surface p-6 shadow-2xl shadow-ink/15`}
       >
         {titulo && (
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-display text-lg font-bold text-ink">{titulo}</h3>
+          <div className="mb-5 flex items-center justify-between border-b border-border pb-3.5">
+            <h3 className="font-display text-base font-bold text-ink">{titulo}</h3>
             <button
               onClick={onCerrar}
-              className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-ink"
-              aria-label="Cerrar"
+              className="rounded-md p-1 text-ink-faint transition-colors hover:bg-surface-hover hover:text-ink"
+              aria-label="Cerrar modal"
             >
-              ×
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         )}
@@ -42,10 +45,6 @@ export function Modal({ abierto, onCerrar, titulo, children, ancho = 'max-w-md' 
   )
 }
 
-/**
- * Proveedor que expone `confirmar()` para diálogos de confirmación imperativos,
- * sin tener que declarar estado de modal en cada pantalla.
- */
 export function ModalProvider({ children }) {
   const [dialogo, setDialogo] = useState(null)
 
@@ -64,22 +63,18 @@ export function ModalProvider({ children }) {
     <ModalContext.Provider value={{ confirmar }}>
       {children}
       <Modal abierto={!!dialogo} onCerrar={() => resolverCon(false)} titulo={dialogo?.titulo}>
-        <p className="text-sm text-zinc-600">{dialogo?.mensaje}</p>
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => resolverCon(false)}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-500 transition-colors hover:bg-zinc-100"
-          >
+        <p className="text-sm text-ink-muted leading-relaxed">{dialogo?.mensaje}</p>
+        <div className="mt-6 flex justify-end gap-2.5">
+          <Button variante="fantasma" tamano="sm" onClick={() => resolverCon(false)}>
             {dialogo?.textoCancelar}
-          </button>
-          <button
+          </Button>
+          <Button
+            variante={dialogo?.peligro ? 'peligro' : 'primaria'}
+            tamano="sm"
             onClick={() => resolverCon(true)}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
-              dialogo?.peligro ? 'bg-danger hover:bg-danger/90' : 'bg-ink hover:bg-ink/90'
-            }`}
           >
             {dialogo?.textoConfirmar}
-          </button>
+          </Button>
         </div>
       </Modal>
     </ModalContext.Provider>

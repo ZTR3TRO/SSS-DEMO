@@ -13,11 +13,11 @@ import PaginaProximamente from './pages/PaginaProximamente'
 import PortalInicio from './pages/PortalInicio'
 
 const TITULOS_ADMIN = {
-  inicio: { titulo: 'Inicio', descripcion: 'Resumen general del salón' },
-  inventario: { titulo: 'Inventario', descripcion: 'Catálogo de productos y control de stock' },
-  pos: { titulo: 'Punto de venta', descripcion: 'Cobro rápido por categorías' },
-  citas: { titulo: 'Citas', descripcion: 'Agenda y disponibilidad' },
-  usuarios: { titulo: 'Usuarios', descripcion: 'Empleados y clientes frecuentes' },
+  inicio: { titulo: 'Panel General', descripcion: 'Métricas clave y actividad del día' },
+  inventario: { titulo: 'Inventario', descripcion: 'Catálogo de productos y control de existencias' },
+  pos: { titulo: 'Punto de Venta', descripcion: 'Registro de cobros y ventas directas' },
+  citas: { titulo: 'Agenda', descripcion: 'Control de citas y horarios disponibles' },
+  usuarios: { titulo: 'Directorio', descripcion: 'Equipo de trabajo y cartera de clientes' },
 }
 
 const SECCIONES_LISTAS = ['inicio', 'inventario', 'pos', 'citas', 'usuarios']
@@ -26,10 +26,10 @@ function PanelAdmin({ sub, api, navegar }) {
   const info = TITULOS_ADMIN[sub] ?? TITULOS_ADMIN.inicio
 
   return (
-    <div className="flex min-h-svh bg-bone">
+    <div className="flex min-h-svh bg-canvas">
       <Sidebar activo={sub} onNavegar={navegar} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar titulo={info.titulo} descripcion={info.descripcion} api={api} />
+        <Topbar titulo={info.titulo} descripcion={info.descripcion} />
         <main className="scrollbar-fina flex-1 overflow-y-auto px-8 py-8">
           {sub === 'inicio' && <PaginaInicio api={api} onNavegar={navegar} />}
           {sub === 'inventario' && <PaginaInventario />}
