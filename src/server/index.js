@@ -9,6 +9,8 @@ import inventarioRoutes from './routes/inventario.js'
 import posRoutes from './routes/pos.js'
 import citasRoutes from './routes/citas.js'
 import usuariosRoutes from './routes/usuarios.js'
+import whatsappRoutes from './routes/whatsapp.js'
+import { iniciarWhatsApp } from './whatsapp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -38,6 +40,10 @@ app.use('/api/pos', posRoutes)
 app.use('/api/inventario', inventarioRoutes)
 app.use('/api/citas', citasRoutes)
 app.use('/api/usuarios', usuariosRoutes)
+app.use('/api/whatsapp', whatsappRoutes)
+
+// WhatsApp (Baileys) arranca junto con la API: mantiene la sesión y escucha respuestas de los clientes.
+iniciarWhatsApp()
 
 if (fs.existsSync(dist)) {
   app.use(express.static(dist))

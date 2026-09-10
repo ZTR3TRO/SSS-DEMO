@@ -82,21 +82,15 @@ router.get('/mis-citas', (req, res) => {
 // GET /api/citas?fecha=YYYY-MM-DD
 router.get('/', (req, res) => {
   const { fecha } = req.query
+  const select = `
+    SELECT c.*, s.duracion_min AS servicio_duracion, s.precio AS servicio_precio,
+           cl.telefono AS cliente_telefono
+    FROM citas c
+    LEFT JOIN servicios s ON s.id = c.servicio_id
+    LEFT JOIN clientes cl ON cl.id = c.cliente_id`
   const citas = fecha
-    ? db
-        .prepare(
-          `SELECT c.*, s.duracion_min AS servicio_duracion, s.precio AS servicio_precio
-           FROM citas c LEFT JOIN servicios s ON s.id = c.servicio_id
-           WHERE c.fecha = ? ORDER BY c.hora`,
-        )
-        .all(fecha)
-    : db
-        .prepare(
-          `SELECT c.*, s.duracion_min AS servicio_duracion, s.precio AS servicio_precio
-           FROM citas c LEFT JOIN servicios s ON s.id = c.servicio_id
-           WHERE c.fecha >= date('now') ORDER BY c.fecha, c.hora LIMIT 50`,
-        )
-        .all()
+    ? db.prepare(`${select} WHERE c.fecha = ? ORDER BY c.hora`).all(fecha)
+    : db.prepare(`${select} WHERE c.fecha >= date('now') ORDER BY c.fecha, c.hora LIMIT 50`).all()
   res.json({ citas })
 })
 
@@ -104,7 +98,7 @@ router.get('/', (req, res) => {
 // Fase 5 (Opción A): admite cliente_id de una ficha ya registrada; si no se manda,
 // la cita se sigue creando "rápida" solo con el texto libre en `cliente`, como hasta ahora.
 router.post('/', (req, res) => {
-  const { cliente, cliente_id, servicio_id, fecha, hora, notas } = req.body
+  const { cliente, cliente_id, servicio_id, fecha, hora, notas, telefono } = req.body
   const errores = []
 
   const clienteFicha = cliente_id ? db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id) : null
@@ -134,7 +128,7 @@ router.post('/', (req, res) => {
 
   const info = db
     .prepare(
-      'INSERT INTO citas (cliente, cliente_id, servicio, servicio_id, fecha, hora, estado, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO citas (cliente, cliente_id, servicio, servicio_id, fecha, hora, estado, notas, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     )
     .run(
       nombreCliente,
@@ -145,6 +139,7 @@ router.post('/', (req, res) => {
       hora,
       'pendiente',
       notas ?? null,
+      telefono?.trim() || null,
     )
 
   const cita = db.prepare('SELECT * FROM citas WHERE id = ?').get(info.lastInsertRowid)
@@ -162,6 +157,17 @@ router.patch('/:id/estado', (req, res) => {
   }
 
   db.prepare('UPDATE citas SET estado = ? WHERE id = ?').run(estado, req.params.id)
+  const actualizada = db.prepare('SELECT * FROM citas WHERE id = ?').get(req.params.id)
+  res.json({ ok: true, cita: actualizada })
+})
+
+// PATCH /api/citas/:id/telefono  { telefono } — teléfono de WhatsApp de la cita
+router.patch('/:id/telefono', (req, res) => {
+  const cita = db.prepare('SELECT * FROM citas WHERE id = ?').get(req.params.id)
+  if (!cita) return res.status(404).json({ ok: false, errores: ['Cita no encontrada.'] })
+
+  const telefono = req.body?.telefono?.trim() || null
+  db.prepare('UPDATE citas SET telefono = ? WHERE id = ?').run(telefono, req.params.id)
   const actualizada = db.prepare('SELECT * FROM citas WHERE id = ?').get(req.params.id)
   res.json({ ok: true, cita: actualizada })
 })

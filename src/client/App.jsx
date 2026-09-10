@@ -9,6 +9,7 @@ import PaginaInventario from './pages/PaginaInventario'
 import PaginaPOS from './pages/PaginaPOS'
 import PaginaCitas from './pages/PaginaCitas'
 import PaginaUsuarios from './pages/PaginaUsuarios'
+import PaginaWhatsApp from './pages/PaginaWhatsApp'
 import PaginaProximamente from './pages/PaginaProximamente'
 import PortalInicio from './pages/PortalInicio'
 
@@ -18,9 +19,10 @@ const TITULOS_ADMIN = {
   pos: { titulo: 'Punto de Venta', descripcion: 'Registro de cobros y ventas directas' },
   citas: { titulo: 'Agenda', descripcion: 'Control de citas y horarios disponibles' },
   usuarios: { titulo: 'Directorio', descripcion: 'Equipo de trabajo y cartera de clientes' },
+  whatsapp: { titulo: 'WhatsApp', descripcion: 'Vinculación y confirmación de citas por WhatsApp' },
 }
 
-const SECCIONES_LISTAS = ['inicio', 'inventario', 'pos', 'citas', 'usuarios']
+const SECCIONES_LISTAS = ['inicio', 'inventario', 'pos', 'citas', 'usuarios', 'whatsapp']
 
 function PanelAdmin({ sub, api, navegar }) {
   const info = TITULOS_ADMIN[sub] ?? TITULOS_ADMIN.inicio
@@ -36,6 +38,7 @@ function PanelAdmin({ sub, api, navegar }) {
           {sub === 'pos' && <PaginaPOS />}
           {sub === 'citas' && <PaginaCitas />}
           {sub === 'usuarios' && <PaginaUsuarios />}
+          {sub === 'whatsapp' && <PaginaWhatsApp />}
           {!SECCIONES_LISTAS.includes(sub) && <PaginaProximamente modulo={info.titulo} paso="6" />}
         </main>
       </div>

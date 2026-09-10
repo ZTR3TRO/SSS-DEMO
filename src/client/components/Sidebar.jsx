@@ -24,6 +24,11 @@ const ICONOS = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
   ),
+  whatsapp: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a9 9 0 00-7.79 13.55L3 21l4.55-1.19A9 9 0 1012 3zm3.5 10.5c-.5.25-.9.4-1.25.4-.3 0-.7-.1-1.2-.4a6.9 6.9 0 01-1.35-1.1 5.6 5.6 0 01-1.3-4.3c.05-.7.55-1.3 1.25-1.45.2-.05.4 0 .55.15.1.15.4.9.5 1.1.05.15.1.35-.05.6l-.25.4c-.1.1-.15.2-.05.35.3.5.7 1 1.2 1.4.15.15.4.3.6.4.15.1.3.05.4-.05.15-.15.35-.4.55-.55.15-.15.3-.1.5-.05.15.05.95.45 1.1.55.2.1.25.2.25.3-.05.15-.2.35-.45.45z" />
+    </svg>
+  ),
 }
 
 const ITEMS = [
@@ -32,6 +37,7 @@ const ITEMS = [
   { key: 'pos', label: 'Punto de venta' },
   { key: 'citas', label: 'Citas' },
   { key: 'usuarios', label: 'Usuarios' },
+  { key: 'whatsapp', label: 'WhatsApp' },
 ]
 
 export default function Sidebar({ activo, onNavegar }) {

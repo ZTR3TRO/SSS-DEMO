@@ -76,6 +76,17 @@ export function initDb() {
       notas TEXT,
       creado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS whatsapp_mensajes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      direccion TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'texto',
+      cita_id INTEGER REFERENCES citas(id),
+      telefono TEXT NOT NULL,
+      mensaje TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'respondida',
+      creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
 
   // Migraciones incrementales: columnas agregadas después de la v1 del esquema.
@@ -85,4 +96,6 @@ export function initDb() {
   agregarColumnaSiFalta('citas', 'notas', 'TEXT')
   // Fase 5 — vínculo opcional cita → ficha de cliente (Opción A: nullable, conserva el texto libre como respaldo).
   agregarColumnaSiFalta('citas', 'cliente_id', 'INTEGER REFERENCES clientes(id)')
+  // Fase 7 — teléfono de WhatsApp por cita (opcional; usa la ficha del cliente como respaldo).
+  agregarColumnaSiFalta('citas', 'telefono', 'TEXT')
 }
