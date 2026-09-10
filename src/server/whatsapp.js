@@ -51,7 +51,9 @@ export function getEstado() {
 }
 
 export function estaConectado() {
-  return !!socket && estado.estado === 'conectado'
+  if (socket && estado.estado === 'conectado') return true
+  if (estado.estado === 'conectado' && !socket) estado.estado = 'conectando'
+  return false
 }
 
 /** Interpreta la respuesta de la cita: 'si' | 'no' | null. */
@@ -88,7 +90,17 @@ export async function enviarTexto(telefonoE164, texto) {
     throw new Error('WhatsApp no está vinculado todavía.')
   }
   const jid = `${telefonoE164.replace('+', '')}@s.whatsapp.net`
-  await socket.sendMessage(jid, { text: texto })
+  try {
+    console.log(`[whatsapp] Enviando a ${telefonoE164}…`)
+    await socket.sendMessage(jid, { text: texto })
+    console.log(`[whatsapp] Enviado a ${telefonoE164} ✓`)
+  } catch (e) {
+    const detalle = String(e?.message ?? e ?? 'error desconocido')
+    if (/not registered|no está registrado|número no registrado|bad-request|Bad Request/i.test(detalle)) {
+      throw new Error(`El número ${formatearTelefono(telefonoE164)} no está registrado en WhatsApp.`)
+    }
+    throw new Error(`No se pudo enviar el mensaje a ${formatearTelefono(telefonoE164)}: ${detalle}`)
+  }
 }
 
 function guardarMensaje({ direccion, tipo = 'texto', citaId = null, telefono, mensaje, estadoMsg = 'respondida' }) {
@@ -184,7 +196,9 @@ async function reiniciarSocket() {
       auth: { creds: state.creds, keys: state.keys },
       printQRInTerminal: false,
       browser: Browsers.ubuntu('SSSALON'),
-      syncFullHistory: false,
+      // Trae contactos/historial al vincular: permite resolver números nuevos y mandarles mensaje.
+      // (En Baileys, sin historial sincronizado, los números nunca contactados no se resuelven.)
+      syncFullHistory: true,
     })
 
     socket.ev.on('creds.update', saveCreds)
@@ -209,6 +223,7 @@ async function reiniciarSocket() {
         const codigo = lastDisconnect?.error?.output?.statusCode
         const cerrado = codigo === DisconnectReason.loggedOut
         socket = null
+        estado.estado = 'conectando'
         if (cerrado) {
           estado.qr = null
           estado.telefono = null
