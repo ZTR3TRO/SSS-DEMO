@@ -35,10 +35,10 @@ router.post('/vincular', async (_req, res) => {
 router.post('/prueba', async (req, res) => {
   const telefono = normalizarTelefono(req.body?.telefono)
   if (!telefono) {
-    return res.status(400).json({ ok: false, error: 'Teléfono inválido. Usa un número mexicano (ej. 667 100 2001).' })
+    return res.status(400).json({ ok: false, errores: ['Teléfono inválido. Usa un número mexicano (ej. 667 100 2001).'] })
   }
   if (!estaConectado()) {
-    return res.status(409).json({ ok: false, error: 'WhatsApp no está vinculado. Escanea el QR en el módulo de WhatsApp.' })
+    return res.status(409).json({ ok: false, errores: ['WhatsApp no está vinculado. Escanea el QR en el módulo de WhatsApp.'] })
   }
   try {
     const texto = '¡Hola! 👋 Esto es una prueba desde el panel de SSSALÓN. Recibirás aquí las confirmaciones de tus citas.'
@@ -49,14 +49,14 @@ router.post('/prueba', async (req, res) => {
     ).run(telefono, texto)
     res.json({ ok: true, telefono: formatearTelefono(telefono) })
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message })
+    res.status(500).json({ ok: false, errores: [e.message] })
   }
 })
 
 router.post('/enviar-confirmacion', async (req, res) => {
   const citaId = Number(req.body?.cita_id)
   if (!citaId) {
-    return res.status(400).json({ ok: false, error: 'Falta el id de la cita.' })
+    return res.status(400).json({ ok: false, errores: ['Falta el id de la cita.'] })
   }
 
   const cita = db
@@ -72,22 +72,42 @@ router.post('/enviar-confirmacion', async (req, res) => {
     .get(citaId)
 
   if (!cita) {
-    return res.status(404).json({ ok: false, error: 'No se encontró la cita.' })
+    return res.status(404).json({ ok: false, errores: ['No se encontró la cita.'] })
   }
   if (cita.estado !== 'pendiente') {
-    return res.status(400).json({ ok: false, error: 'Solo se confirman por WhatsApp las citas en estado "pendiente".' })
+    return res.status(400).json({ ok: false, errores: ['Solo se confirman por WhatsApp las citas en estado "pendiente".'] })
   }
 
   const telefono = normalizarTelefono(cita.telefono_envio)
   if (!telefono) {
     return res.status(400).json({
       ok: false,
-      error: 'La cita no tiene un teléfono válido. Agrega o edita el teléfono de la cita.',
+      errores: ['La cita no tiene un teléfono válido. Agrega o edita el teléfono de la cita.'],
     })
   }
 
   if (!estaConectado()) {
-    return res.status(409).json({ ok: false, error: 'WhatsApp no está vinculado. Escanea el QR en el módulo de WhatsApp.' })
+    return res.status(409).json({ ok: false, errores: ['WhatsApp no está vinculado. Escanea el QR en el módulo de WhatsApp.'] })
+  }
+
+  // Evita reenvíos accidentales: si ya hay una confirmación reciente esperando respuesta
+  // para esta misma cita, no se manda otra (mandar varios mensajes seguidos al mismo
+  // chat es una causa típica de que WhatsApp tarde en entregar o se quede "esperando").
+  const COOLDOWN_MS = 2 * 60 * 1000 // 2 minutos
+  const confirmacionPendiente = db
+    .prepare(
+      `SELECT * FROM whatsapp_mensajes WHERE tipo = 'confirmacion' AND estado = 'pendiente' AND cita_id = ? ORDER BY id DESC LIMIT 1`,
+    )
+    .get(citaId)
+  if (confirmacionPendiente) {
+    const enviadaHaceMs = Date.now() - new Date(confirmacionPendiente.creado_en.replace(' ', 'T') + 'Z').getTime()
+    if (enviadaHaceMs < COOLDOWN_MS) {
+      const segundosRestantes = Math.ceil((COOLDOWN_MS - enviadaHaceMs) / 1000)
+      return res.status(409).json({
+        ok: false,
+        errores: [`Ya se envió una confirmación a este cliente hace poco. Espera ${segundosRestantes}s antes de reenviar.`],
+      })
+    }
   }
 
   const servicio = cita.servicio_nombre ?? cita.servicio
@@ -110,7 +130,7 @@ router.post('/enviar-confirmacion', async (req, res) => {
     ).run(citaId, telefono, texto)
     res.json({ ok: true, telefono: formatearTelefono(telefono), mensaje: 'Mensaje de confirmación enviado.' })
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message })
+    res.status(500).json({ ok: false, errores: [e.message] })
   }
 })
 

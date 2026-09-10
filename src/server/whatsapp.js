@@ -15,7 +15,10 @@ const estado = {
   telefono: null,
   nombre: null,
   ultimaConexion: null,
+  listo: false, // true unos segundos después de 'open', cuando la sesión ya sincronizó
 }
+
+const ESPERA_CALENTAMIENTO_MS = 3000
 
 let socket = null
 let reiniciando = false
@@ -51,9 +54,7 @@ export function getEstado() {
 }
 
 export function estaConectado() {
-  if (socket && estado.estado === 'conectado') return true
-  if (estado.estado === 'conectado' && !socket) estado.estado = 'conectando'
-  return false
+  return !!socket && estado.estado === 'conectado' && estado.listo
 }
 
 /** Interpreta la respuesta de la cita: 'si' | 'no' | null. */
@@ -73,8 +74,9 @@ function interpretarRespuesta(texto) {
 
 function normalizarJid(jid) {
   if (!jid) return null
+  if (jid.endsWith('@g.us')) return null // chat grupal, no aplica a confirmaciones
   const base = jid.split('@')[0]?.replace(/\D/g, '') ?? ''
-  return base.endsWith('@g.us') ? null : base
+  return base || null
 }
 
 function telefonoCoincide(guardado, jidNumeros) {
@@ -85,22 +87,38 @@ function telefonoCoincide(guardado, jidNumeros) {
   return jidNumeros.endsWith(guardadoDigitos.slice(-10))
 }
 
+/**
+ * Resuelve el JID real de WhatsApp para un teléfono E.164 mexicano.
+ * Los números MX antiguos requieren un "1" extra después del "52"
+ * (521XXXXXXXXXX) para entregarse; los más nuevos no lo usan (52XXXXXXXXXX).
+ * Probamos ambos candidatos con socket.onWhatsApp() y usamos el que sí existe,
+ * en vez de asumir uno y enviar "a ciegas" (Baileys no avisa si el JID no existe).
+ */
+async function resolverJid(telefonoE164) {
+  const digitos = telefonoE164.replace('+', '')
+  const candidatos = [digitos]
+  if (digitos.startsWith('52') && !digitos.startsWith('521')) {
+    candidatos.push(`521${digitos.slice(2)}`)
+  }
+
+  try {
+    const resultados = await socket.onWhatsApp(...candidatos)
+    const encontrado = resultados?.find((r) => r.exists)
+    if (encontrado) return encontrado.jid
+  } catch (e) {
+    console.warn('[whatsapp] onWhatsApp falló, se usará el JID por defecto:', e.message)
+  }
+
+  // Si no pudimos verificar (o ninguno "existe" según WhatsApp), intentamos con el formato base.
+  return `${digitos}@s.whatsapp.net`
+}
+
 export async function enviarTexto(telefonoE164, texto) {
   if (!estaConectado()) {
     throw new Error('WhatsApp no está vinculado todavía.')
   }
-  const jid = `${telefonoE164.replace('+', '')}@s.whatsapp.net`
-  try {
-    console.log(`[whatsapp] Enviando a ${telefonoE164}…`)
-    await socket.sendMessage(jid, { text: texto })
-    console.log(`[whatsapp] Enviado a ${telefonoE164} ✓`)
-  } catch (e) {
-    const detalle = String(e?.message ?? e ?? 'error desconocido')
-    if (/not registered|no está registrado|número no registrado|bad-request|Bad Request/i.test(detalle)) {
-      throw new Error(`El número ${formatearTelefono(telefonoE164)} no está registrado en WhatsApp.`)
-    }
-    throw new Error(`No se pudo enviar el mensaje a ${formatearTelefono(telefonoE164)}: ${detalle}`)
-  }
+  const jid = await resolverJid(telefonoE164)
+  await socket.sendMessage(jid, { text: texto })
 }
 
 function guardarMensaje({ direccion, tipo = 'texto', citaId = null, telefono, mensaje, estadoMsg = 'respondida' }) {
@@ -162,7 +180,11 @@ async function manejarMensajeEntrante(mensaje) {
   const key = mensaje.key
   if (!key || key.fromMe) return
 
-  const jidNumeros = normalizarJid(key.remoteJid)
+  // WhatsApp a veces entrega el remitente como un LID (identificador opaco, ej. "123...@lid")
+  // en vez del número de teléfono real. Cuando pasa eso, Baileys expone el número real en
+  // `key.senderPn` — lo usamos primero, y el remoteJid solo como respaldo.
+  const jidParaNumero = key.senderPn || key.remoteJid
+  const jidNumeros = normalizarJid(jidParaNumero)
   if (!jidNumeros) return
 
   const texto =
@@ -173,10 +195,20 @@ async function manejarMensajeEntrante(mensaje) {
   if (!texto || !texto.trim()) return
 
   const candidatas = citasPendientes.all().filter((c) => telefonoCoincide(c.telefono_envio, jidNumeros))
-  if (candidatas.length === 0) return
+  if (candidatas.length === 0) {
+    console.log(`[whatsapp] Mensaje de ${jidNumeros} no coincide con ninguna confirmación pendiente. Se ignora.`)
+    return
+  }
   const pendiente = candidatas[0]
 
-  if (!estaConectado()) return
+  if (!estaConectado()) {
+    console.warn(
+      `[whatsapp] Mensaje entrante de ${jidNumeros} para la cita #${pendiente.id} se ignoró: el socket no está listo (estado: ${estado.estado}, listo: ${estado.listo}).`
+    )
+    return
+  }
+
+  console.log(`[whatsapp] Procesando respuesta de ${jidNumeros} para la cita #${pendiente.id}: "${texto.trim()}"`)
   await responderConfirmacion(pendiente, texto.trim())
 }
 
@@ -196,9 +228,15 @@ async function reiniciarSocket() {
       auth: { creds: state.creds, keys: state.keys },
       printQRInTerminal: false,
       browser: Browsers.ubuntu('SSSALON'),
-      // Trae contactos/historial al vincular: permite resolver números nuevos y mandarles mensaje.
-      // (En Baileys, sin historial sincronizado, los números nunca contactados no se resuelven.)
-      syncFullHistory: true,
+      syncFullHistory: false,
+      // IMPORTANTE: sin este callback, Baileys deshabilita TODA sincronización
+      // (no solo el historial completo) cuando syncFullHistory es false, lo cual
+      // impide que reciba el mapeo LID↔teléfono. Sin ese mapeo, las cuentas
+      // mexicanas (que WhatsApp ya migró a direccionamiento por LID) no pueden
+      // resolver ni descifrar mensajes entrantes de forma confiable después del
+      // primer intercambio — causa raíz confirmada de "responde el primero, nunca
+      // los siguientes". No necesitamos historial de chats, pero sí este sync base.
+      shouldSyncHistoryMessage: () => true,
     })
 
     socket.ev.on('creds.update', saveCreds)
@@ -213,17 +251,30 @@ async function reiniciarSocket() {
       if (connection === 'open') {
         estado.estado = 'conectado'
         estado.qr = null
+        estado.listo = false
         estado.telefono = socket.user?.id?.split(':')[0] ?? null
         estado.nombre = socket.authState?.creds?.me?.name ?? null
         estado.ultimaConexion = new Date().toISOString()
-        console.log('[whatsapp] Conectado:', estado.telefono)
+        console.log('[whatsapp] Conectado:', estado.telefono, '— calentando sesión…')
+
+        // Pequeño margen antes de permitir envíos: justo tras 'open' la sesión de cifrado
+        // todavía está sincronizando, y mandar de inmediato es una causa común de mensajes
+        // lentos o atorados en "esperando este mensaje".
+        const socketAlAbrir = socket
+        setTimeout(() => {
+          if (socket !== socketAlAbrir) return // hubo una reconexión en medio, ignorar
+          estado.listo = true
+          socket?.sendPresenceUpdate('available').catch(() => {})
+          console.log('[whatsapp] Sesión lista para enviar.')
+        }, ESPERA_CALENTAMIENTO_MS)
       }
 
       if (connection === 'close') {
         const codigo = lastDisconnect?.error?.output?.statusCode
         const cerrado = codigo === DisconnectReason.loggedOut
+        console.warn('[whatsapp] Conexión cerrada. Código:', codigo, '— cerrando sesión definitivamente:', cerrado)
         socket = null
-        estado.estado = 'conectando'
+        estado.listo = false
         if (cerrado) {
           estado.qr = null
           estado.telefono = null
